@@ -1,0 +1,108 @@
+@model NazmEWasl.Web.Models.Domain.Song
+@{
+    ViewData["Title"] = $"Assets — {Model.Title}";
+    var cardFiles = ViewBag.CardPaths as List<string> ?? new();
+    bool videoExists = ViewBag.VideoExists ?? false;
+}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1>Assets</h1>
+        <p class="text-muted">@Model.Title &mdash; @Model.Artist</p>
+    </div>
+    <a asp-controller="Songs" asp-action="Detail" asp-route-id="@Model.Id" class="btn btn-outline-secondary">← Song Detail</a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Warning"] != null)
+{
+    <div class="alert alert-warning alert-dismissible fade show">
+        @TempData["Warning"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (Model.Status == NazmEWasl.Web.Models.Domain.SongStatus.Approved)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <form asp-action="Generate" asp-route-songId="@Model.Id" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-success">Generate Cards &amp; Video</button>
+                <small class="text-muted ms-3">This will run the card and video rendering pipeline.</small>
+            </form>
+        </div>
+    </div>
+}
+
+<!-- Verse Cards -->
+<h5>Verse Cards (@cardFiles.Count)</h5>
+@if (!cardFiles.Any())
+{
+    <p class="text-muted">No cards generated yet.</p>
+}
+else
+{
+    <ul class="list-group mb-3">
+        @foreach (var file in cardFiles)
+        {
+            <li class="list-group-item">@file</li>
+        }
+    </ul>
+    <a asp-action="DownloadCards" asp-route-songId="@Model.Id" class="btn btn-outline-primary mb-4">
+        Download All Cards (ZIP)
+    </a>
+}
+
+<!-- Video -->
+<h5>Full Lyric Video</h5>
+@if (!videoExists)
+{
+    <p class="text-muted">No video generated yet.</p>
+}
+else
+{
+    <p class="text-success">Video ready.</p>
+    <a asp-action="DownloadVideo" asp-route-songId="@Model.Id" class="btn btn-outline-success mb-4">
+        Download Video (MP4)
+    </a>
+}
+
+<!-- Asset management actions -->
+<div class="d-flex flex-wrap gap-2 mt-3">
+    <!-- Open in Explorer — Feature 4 -->
+    <form asp-action="OpenFolder" asp-route-songId="@Model.Id" method="post">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-outline-secondary btn-sm">&#128193; Open in Explorer</button>
+    </form>
+
+    <!-- Delete Assets — Feature 3 -->
+    @if (cardFiles.Any() || videoExists)
+    {
+        <form asp-action="DeleteAssets" asp-route-songId="@Model.Id" method="post"
+              onsubmit="return confirm('Delete all generated cards and video? Translations are preserved.')">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-danger btn-sm">&#128465; Delete Assets</button>
+        </form>
+        <small class="text-muted align-self-center">Translations are preserved — only generated files are removed.</small>
+    }
+</div>
+
+<!-- Re-generate -->
+@if (cardFiles.Any() || videoExists)
+{
+    <div class="mt-4">
+        <form asp-action="Generate" asp-route-songId="@Model.Id" method="post"
+              onsubmit="return confirm('Re-generate all assets? Existing files will be overwritten.')">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-warning">Re-generate Assets</button>
+        </form>
+    </div>
+}
+<small class="text-muted d-block mt-1">(Open in Explorer only works when running locally on Windows)</small>

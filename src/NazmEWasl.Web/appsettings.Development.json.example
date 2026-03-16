@@ -1,0 +1,17 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "Anthropic": {
+    "ApiKey": "sk-ant-api03-..."
+  },
+  "Gemini": {
+    "ApiKey": "AIzaSy..."
+  },
+  "OpenAI": {
+    "ApiKey": "sk-..."
+  }
+}

@@ -1,0 +1,12 @@
+appsettings.Development.json
+*.db
+*.db-shm
+*.db-wal
+/songs/
+__pycache__/
+*.pyc
+.venv/
+bin/
+obj/
+.vs/
+*.user

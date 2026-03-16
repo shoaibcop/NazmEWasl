@@ -1,0 +1,174 @@
+@model NazmEWasl.Web.Models.ViewModels.TranslationReviewViewModel
+@{
+    ViewData["Title"] = $"Review — {Model.Song.Title}";
+    var song = Model.Song;
+    var activeLangs = Model.ActiveLanguages;
+
+    bool VerseHasAllContent(NazmEWasl.Web.Models.Domain.Verse v) =>
+        activeLangs.All(lang => lang switch
+        {
+            "RomanUrdu" => !string.IsNullOrWhiteSpace(v.RomanUrdu),
+            "English"   => !string.IsNullOrWhiteSpace(v.EnglishText),
+            "Hindi"     => !string.IsNullOrWhiteSpace(v.HindiText),
+            _           => true
+        });
+
+    bool allHaveContent = Model.Verses.All(VerseHasAllContent);
+
+    string LangLabel(string lang) => lang switch
+    {
+        "RomanUrdu" => "Roman Urdu",
+        "English"   => "English",
+        "Hindi"     => "Hindi",
+        _           => lang
+    };
+
+    string? GetVerseText(NazmEWasl.Web.Models.Domain.Verse v, string lang) => lang switch
+    {
+        "RomanUrdu" => v.RomanUrdu,
+        "English"   => v.EnglishText,
+        "Hindi"     => v.HindiText,
+        _           => null
+    };
+
+    string FieldName(string lang) => lang switch
+    {
+        "RomanUrdu" => "romanUrdu",
+        "English"   => "englishText",
+        "Hindi"     => "hindiText",
+        _           => lang
+    };
+}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1>Translation Review</h1>
+        <p class="text-muted">@song.Title &mdash; @song.Artist</p>
+    </div>
+    <a asp-controller="Songs" asp-action="Detail" asp-route-id="@song.Id" class="btn btn-outline-secondary">← Song Detail</a>
+</div>
+
+@if (!allHaveContent)
+{
+    <div class="alert alert-warning">
+        Some verses are missing translations for one or more selected languages
+        (@string.Join(", ", activeLangs.Select(LangLabel))).
+        Re-translate individual verses below, or return to the song to run translation again.
+    </div>
+}
+
+@foreach (var verse in Model.Verses)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Verse @verse.VerseNumber</strong>
+            <small class="text-muted">
+                @if (verse.StartMs.HasValue)
+                { @($"{verse.StartMs}ms – {verse.EndMs}ms") }
+            </small>
+        </div>
+        <div class="card-body">
+            <p class="text-end fs-5" dir="rtl" style="line-height:2;">@verse.PersianText</p>
+            <hr />
+
+            @if (activeLangs.Count == 1)
+            {
+                <!-- Single language — no tabs needed -->
+                var lang = activeLangs[0];
+                <form asp-controller="Translation" asp-action="SaveVerse"
+                      asp-route-songId="@song.Id" asp-route-n="@verse.VerseNumber" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold small">@LangLabel(lang)</label>
+                        <textarea name="@FieldName(lang)" class="form-control" rows="2"
+                                  style="font-style:italic;">@GetVerseText(verse, lang)</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                </form>
+                <form asp-controller="Translation" asp-action="RetranslateVerse"
+                      asp-route-songId="@song.Id" asp-route-n="@verse.VerseNumber" method="post" class="mt-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="language" value="@lang" />
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Re-translate</button>
+                </form>
+            }
+            else
+            {
+                <!-- Multiple languages — tabbed -->
+                var tabId = $"tabs-{verse.VerseNumber}";
+                <ul class="nav nav-tabs mb-3" id="@tabId" role="tablist">
+                    @for (int li = 0; li < activeLangs.Count; li++)
+                    {
+                        var lang = activeLangs[li];
+                        var isActive = li == 0;
+                        var btnId = $"tab-{verse.VerseNumber}-{lang}";
+                        var paneId = $"pane-{verse.VerseNumber}-{lang}";
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(isActive ? "active" : "")"
+                                    id="@btnId"
+                                    data-bs-toggle="tab"
+                                    data-bs-target="#@paneId"
+                                    type="button" role="tab"
+                                    aria-controls="@paneId"
+                                    aria-selected="@(isActive ? "true" : "false")">
+                                @LangLabel(lang)
+                                @if (!string.IsNullOrWhiteSpace(GetVerseText(verse, lang)))
+                                {
+                                    <span class="ms-1 badge bg-success" style="font-size:.6rem;">✓</span>
+                                }
+                            </button>
+                        </li>
+                    }
+                </ul>
+
+                <div class="tab-content" id="tabContent-@verse.VerseNumber">
+                    @for (int ti = 0; ti < activeLangs.Count; ti++)
+                    {
+                        var lang = activeLangs[ti];
+                        var isActive = ti == 0;
+                        var paneId = $"pane-{verse.VerseNumber}-{lang}";
+                        <div class="tab-pane fade @(isActive ? "show active" : "")"
+                             id="@paneId" role="tabpanel">
+                            <form asp-controller="Translation" asp-action="SaveVerse"
+                                  asp-route-songId="@song.Id" asp-route-n="@verse.VerseNumber" method="post">
+                                @Html.AntiForgeryToken()
+                                <div class="mb-2">
+                                    <textarea name="@FieldName(lang)" class="form-control" rows="2"
+                                              style="font-style:italic;">@GetVerseText(verse, lang)</textarea>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                </div>
+                            </form>
+                            <form asp-controller="Translation" asp-action="RetranslateVerse"
+                                  asp-route-songId="@song.Id" asp-route-n="@verse.VerseNumber" method="post" class="mt-2">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="language" value="@lang" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    Re-translate @LangLabel(lang)
+                                </button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="card border-success mt-4">
+    <div class="card-body">
+        <form asp-controller="Translation" asp-action="Approve" asp-route-songId="@song.Id" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-success @(!allHaveContent ? "disabled" : "")"
+                    @(!allHaveContent ? "disabled" : "")
+                    onclick="return confirm('Approve all verses and mark song as ready for asset generation?')">
+                Approve All &amp; Generate Assets
+            </button>
+            @if (!allHaveContent)
+            {
+                <small class="text-muted ms-3">All verses must have translations in every selected language before approving.</small>
+            }
+        </form>
+    </div>
+</div>

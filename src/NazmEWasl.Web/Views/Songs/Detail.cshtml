@@ -1,0 +1,304 @@
+@model NazmEWasl.Web.Models.ViewModels.SongDetailViewModel
+@using NazmEWasl.Web.Models.Domain
+@{
+    ViewData["Title"] = Model.Song.Title;
+    var song = Model.Song;
+    var job = Model.LatestJob;
+    var activeBatch = ViewBag.ActiveBatch as TranslationBatch;
+
+    bool StepDone(SongStatus threshold) => song.Status >= threshold;
+    bool isActiveStatus = song.Status == SongStatus.Translating || song.Status == SongStatus.GeneratingAssets;
+}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1>@song.Title</h1>
+        <p class="text-muted mb-0">@song.Artist @(song.Year != null ? $"· {song.Year}" : "")</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary">← Library</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(song.Notes))
+{
+    <p class="fst-italic text-muted">@song.Notes</p>
+}
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="row">
+    <!-- Pipeline Timeline -->
+    <div class="col-md-6">
+        <h5 class="mt-3">Pipeline Status</h5>
+        <ul class="list-group mb-4">
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                1. Upload &amp; Lyrics
+                <span class="badge bg-success">Done</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>
+                    2. Translate (LLM)
+                    @if (!string.IsNullOrWhiteSpace(song.LastTranslationProvider))
+                    { <small class="text-muted ms-1">via @song.LastTranslationProvider</small> }
+                </span>
+                @if (StepDone(SongStatus.AwaitingReview))
+                    { <span class="badge bg-success">Done</span> }
+                else if (song.Status == SongStatus.Translating && activeBatch != null)
+                    { <span class="badge bg-warning text-dark">&#128336; Batch pending</span> }
+                else if (song.Status == SongStatus.Translating)
+                    { <span class="badge bg-info text-dark">&#9889; Running...</span> }
+                else
+                    { <span class="badge bg-secondary">Pending</span> }
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                3. Admin Review
+                @if (StepDone(SongStatus.Approved))
+                    { <span class="badge bg-success">Approved</span> }
+                else if (song.Status == SongStatus.AwaitingReview)
+                    { <span class="badge bg-warning text-dark">Awaiting</span> }
+                else
+                    { <span class="badge bg-secondary">Pending</span> }
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                4. Generate Assets
+                @if (song.Status == SongStatus.Complete)
+                    { <span class="badge bg-success">Done</span> }
+                else if (song.Status == SongStatus.GeneratingAssets)
+                    { <span class="badge bg-info text-dark">Running...</span> }
+                else
+                    { <span class="badge bg-secondary">Pending</span> }
+            </li>
+        </ul>
+
+        @if (job?.Status == JobStatus.Failed)
+        {
+            <div class="alert alert-danger">
+                <strong>Last job failed:</strong> @job.ErrorMessage
+            </div>
+        }
+
+        <!-- Batch status card -->
+        @if (activeBatch != null)
+        {
+            <div class="card border-warning mb-3">
+                <div class="card-header bg-warning text-dark fw-semibold">&#128336; Batch Job Pending</div>
+                <div class="card-body">
+                    <p class="mb-1 small"><strong>Provider:</strong> @activeBatch.Provider</p>
+                    <p class="mb-1 small"><strong>ID:</strong> <code>@activeBatch.ExternalBatchId</code></p>
+                    <p class="mb-2 small"><strong>Submitted:</strong> @activeBatch.SubmittedAt.ToString("yyyy-MM-dd HH:mm") UTC (up to 24h)</p>
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="checkBatchStatus()">Check Status</button>
+                    <span id="batch-status-msg" class="ms-2 small text-muted"></span>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="col-md-4 offset-md-1">
+        <h5 class="mt-3">Actions</h5>
+
+        @if (song.Status == SongStatus.Uploaded || song.Status == SongStatus.AwaitingReview)
+        {
+            <form asp-action="Translate" asp-route-id="@song.Id" method="post" class="mb-3">
+                @Html.AntiForgeryToken()
+
+                <!-- Translation mode toggle -->
+                <div class="mb-2">
+                    <label class="form-label fw-semibold small">Translation Mode</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="translationMode" id="mode-realtime" value="realtime" checked>
+                            <label class="form-check-label" for="mode-realtime">&#9889; Real-time <small class="text-muted">(immediate)</small></label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="translationMode" id="mode-batch" value="batch">
+                            <label class="form-check-label" for="mode-batch">&#128230; Batch <small class="text-muted">(~50% cheaper, up to 24h)</small></label>
+                        </div>
+                    </div>
+                    <div id="gemini-batch-warning" class="form-text text-warning d-none">
+                        Gemini does not support batch mode — will run real-time.
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label fw-semibold small" for="provider-select">LLM Provider</label>
+                    <select class="form-select form-select-sm" name="provider" id="provider-select">
+                        @{
+                            var selectedProvider = song.LastTranslationProvider ?? "Claude";
+                        }
+                        @foreach (var (val, label) in new[] {
+                            ("Claude", "Claude (Anthropic)"),
+                            ("Gemini", "Gemini (Google)"),
+                            ("OpenAI", "OpenAI (GPT)") })
+                        {
+                            if (val == selectedProvider)
+                            { <option value="@val" selected>@label</option> }
+                            else
+                            { <option value="@val">@label</option> }
+                        }
+                    </select>
+                    @if (!string.IsNullOrWhiteSpace(song.LastTranslationProvider))
+                    {
+                        <div class="form-text">Last used: <strong>@song.LastTranslationProvider</strong></div>
+                    }
+                </div>
+
+                <fieldset class="mb-2">
+                    <legend class="col-form-label fw-semibold pb-1 small">Translate into</legend>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="selectedLanguages"
+                               value="RomanUrdu" id="lang-ru"
+                               @(song.ParsedLanguages.Contains("RomanUrdu") ? "checked" : "")>
+                        <label class="form-check-label" for="lang-ru">Roman Urdu</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="selectedLanguages"
+                               value="English" id="lang-en"
+                               @(song.ParsedLanguages.Contains("English") ? "checked" : "")>
+                        <label class="form-check-label" for="lang-en">English</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="selectedLanguages"
+                               value="Hindi" id="lang-hi"
+                               @(song.ParsedLanguages.Contains("Hindi") ? "checked" : "")>
+                        <label class="form-check-label" for="lang-hi">Hindi</label>
+                    </div>
+                </fieldset>
+                <button type="submit" class="btn btn-outline-primary w-100">Run Translation</button>
+            </form>
+        }
+
+        @if (song.Status == SongStatus.AwaitingReview || song.Status == SongStatus.Approved)
+        {
+            <a asp-controller="Translation" asp-action="Review" asp-route-songId="@song.Id"
+               class="btn btn-outline-warning w-100 mb-2">Go to Translation Review</a>
+        }
+
+        @if (song.Status == SongStatus.Approved)
+        {
+            <a asp-controller="Assets" asp-action="Index" asp-route-songId="@song.Id"
+               class="btn btn-success w-100 mb-2">Generate Assets</a>
+        }
+
+        @if (song.Status == SongStatus.Complete)
+        {
+            <a asp-controller="Assets" asp-action="Index" asp-route-songId="@song.Id"
+               class="btn btn-success w-100 mb-2">Download Assets</a>
+        }
+
+        <form asp-action="Delete" asp-route-id="@song.Id" method="post" class="mt-4"
+              onsubmit="return confirm('Delete this song and all its files?')">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-danger w-100">Delete Song</button>
+        </form>
+    </div>
+</div>
+
+<h5 class="mt-4">Verses (@song.Verses.Count)</h5>
+<table class="table table-sm table-bordered">
+    <thead class="table-light">
+        <tr>
+            <th>#</th>
+            <th>Persian</th>
+            <th>Timestamps</th>
+            <th>Translated</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var verse in song.Verses.OrderBy(v => v.VerseNumber))
+        {
+            <tr>
+                <td>@verse.VerseNumber</td>
+                <td class="text-end" dir="rtl">@verse.PersianText</td>
+                <td class="text-muted small">
+                    @if (verse.StartMs.HasValue)
+                    { @($"{verse.StartMs}ms – {verse.EndMs}ms") }
+                    else { <span>—</span> }
+                </td>
+                <td>
+                    @if (!string.IsNullOrWhiteSpace(verse.RomanUrdu))
+                        { <span class="badge bg-success me-1">RU</span> }
+                    @if (!string.IsNullOrWhiteSpace(verse.EnglishText))
+                        { <span class="badge bg-primary me-1">EN</span> }
+                    @if (!string.IsNullOrWhiteSpace(verse.HindiText))
+                        { <span class="badge bg-warning text-dark me-1">HI</span> }
+                    @if (string.IsNullOrWhiteSpace(verse.RomanUrdu) && string.IsNullOrWhiteSpace(verse.EnglishText) && string.IsNullOrWhiteSpace(verse.HindiText))
+                        { <span class="badge bg-secondary">None</span> }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<!-- Pipeline Log box — Feature 9 -->
+<details open class="mt-4">
+    <summary class="fw-semibold mb-2" style="cursor:pointer;">Pipeline Log</summary>
+    <pre id="log-box" class="bg-dark text-light p-3 rounded"
+         style="height:220px;overflow-y:auto;font-size:13px;white-space:pre-wrap;"></pre>
+</details>
+
+@section Scripts {
+<script>
+(function () {
+    const songId   = @song.Id;
+    const logUrl   = `/assets/${songId}/job-log`;
+    const isActive = @(isActiveStatus ? "true" : "false");
+    let   lastLen  = 0;
+    let   timer    = null;
+
+    function renderLog(text) {
+        if (!text) return;
+        const box = document.getElementById('log-box');
+        // Render token lines in gold
+        const html = text.replace(/\[Tokens\][^\n]*/g, m =>
+            `<span style="color:#f0c040">&#9658; ${m.replace('[Tokens] ', '')}</span>`);
+        box.innerHTML = html;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function pollLog() {
+        fetch(logUrl)
+            .then(r => r.json())
+            .then(data => {
+                renderLog(data.output);
+                if (data.complete && timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .catch(() => {});
+    }
+
+    // Always do one initial load; keep polling if active
+    pollLog();
+    if (isActive) {
+        timer = setInterval(pollLog, 3000);
+    }
+
+    // Batch status check
+    window.checkBatchStatus = function () {
+        const msg = document.getElementById('batch-status-msg');
+        if (msg) msg.textContent = 'Checking...';
+        fetch(`/songs/${songId}/check-batch-status`)
+            .then(r => r.json())
+            .then(data => {
+                if (msg) msg.textContent = data.message || data.status;
+                if (data.status === 'complete') setTimeout(() => location.reload(), 1500);
+            })
+            .catch(() => { if (msg) msg.textContent = 'Network error.'; });
+    };
+})();
+</script>
+}

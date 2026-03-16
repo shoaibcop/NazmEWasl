@@ -1,0 +1,195 @@
+@model NazmEWasl.Web.Models.ViewModels.SettingsViewModel
+@{
+    ViewData["Title"] = "Settings";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Settings</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<form asp-action="Index" method="post">
+    @Html.AntiForgeryToken()
+
+    <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-llm">LLM Providers</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-card">Card Appearance</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-video">Video</a></li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- LLM Providers -->
+        <div class="tab-pane fade show active" id="tab-llm">
+            <div class="row g-4">
+                <!-- Claude -->
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold">Claude (Anthropic)</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label small">API Key</label>
+                                <input type="password" class="form-control form-control-sm" asp-for="AnthropicApiKey" autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Model</label>
+                                <select class="form-select form-select-sm" asp-for="AnthropicModel">
+                                    <option>claude-sonnet-4-6</option>
+                                    <option>claude-opus-4-6</option>
+                                    <option>claude-haiku-4-5-20251001</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Max Tokens</label>
+                                <input type="number" class="form-control form-control-sm" asp-for="AnthropicMaxTokens" min="1000" max="200000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Gemini -->
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold">Gemini (Google)</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label small">API Key</label>
+                                <input type="password" class="form-control form-control-sm" asp-for="GeminiApiKey" autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Model</label>
+                                <select class="form-select form-select-sm" asp-for="GeminiModel">
+                                    <option>gemini-2.0-flash</option>
+                                    <option>gemini-1.5-pro</option>
+                                    <option>gemini-1.5-flash</option>
+                                    <option>gemini-2.5-pro</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Max Tokens</label>
+                                <input type="number" class="form-control form-control-sm" asp-for="GeminiMaxTokens" min="1000" max="200000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- OpenAI -->
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold">OpenAI (GPT)</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label small">API Key</label>
+                                <input type="password" class="form-control form-control-sm" asp-for="OpenAiApiKey" autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Model</label>
+                                <select class="form-select form-select-sm" asp-for="OpenAiModel">
+                                    <option>gpt-4o</option>
+                                    <option>gpt-4o-mini</option>
+                                    <option>gpt-4-turbo</option>
+                                    <option>gpt-3.5-turbo</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Max Tokens</label>
+                                <input type="number" class="form-control form-control-sm" asp-for="OpenAiMaxTokens" min="1000" max="128000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Appearance -->
+        <div class="tab-pane fade" id="tab-card">
+            <div class="card">
+                <div class="card-body" style="max-width: 480px;">
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Persian Font Size: <span id="persian-size-val">@Model.PersianFontSize</span>px</label>
+                        <input type="range" class="form-range" min="32" max="96" step="2"
+                               asp-for="PersianFontSize" id="persian-size-range"
+                               oninput="document.getElementById('persian-size-val').textContent=this.value">
+                        <input type="number" class="form-control form-control-sm mt-1" asp-for="PersianFontSize" min="32" max="96">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Roman Urdu Font Size: <span id="roman-size-val">@Model.RomanUrduFontSize</span>px</label>
+                        <input type="range" class="form-range" min="18" max="64" step="2"
+                               asp-for="RomanUrduFontSize" id="roman-size-range"
+                               oninput="document.getElementById('roman-size-val').textContent=this.value">
+                        <input type="number" class="form-control form-control-sm mt-1" asp-for="RomanUrduFontSize" min="18" max="64">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Font Family</label>
+                        <select class="form-select" asp-for="FontFamily">
+                            <option>Amiri</option>
+                            <option>Georgia</option>
+                            <option>Times New Roman</option>
+                            <option>serif</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Overlay Opacity: <span id="opacity-val">@Model.OverlayOpacity</span></label>
+                        <input type="range" class="form-range" min="0.3" max="0.95" step="0.01"
+                               asp-for="OverlayOpacity" id="opacity-range"
+                               oninput="document.getElementById('opacity-val').textContent=parseFloat(this.value).toFixed(2)">
+                        <input type="number" class="form-control form-control-sm mt-1" asp-for="OverlayOpacity" min="0.3" max="0.95" step="0.01">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video -->
+        <div class="tab-pane fade" id="tab-video">
+            <div class="card">
+                <div class="card-body" style="max-width: 360px;">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">FPS</label>
+                        <input type="number" class="form-control" asp-for="Fps" min="12" max="60">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Resolution</label>
+                        <select class="form-select" id="resolution-select" onchange="applyResolution(this.value)">
+                            <option value="1080x1080" selected>1080 × 1080 (Square)</option>
+                            <option value="1920x1080">1920 × 1080 (Landscape)</option>
+                            <option value="720x720">720 × 720 (Small Square)</option>
+                        </select>
+                        <div class="row mt-2 g-2">
+                            <div class="col">
+                                <label class="form-label small">Width</label>
+                                <input type="number" class="form-control form-control-sm" asp-for="Width" min="480" max="3840">
+                            </div>
+                            <div class="col">
+                                <label class="form-label small">Height</label>
+                                <input type="number" class="form-control form-control-sm" asp-for="Height" min="480" max="3840">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">End Card Duration (seconds)</label>
+                        <input type="number" class="form-control" asp-for="EndCardDurationSec" min="1" max="30">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <a asp-controller="Songs" asp-action="Index" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+function applyResolution(val) {
+    const parts = val.split('x');
+    document.querySelector('[name="Width"]').value  = parts[0];
+    document.querySelector('[name="Height"]').value = parts[1];
+}
+</script>
+}

@@ -1,0 +1,72 @@
+@model NazmEWasl.Web.Models.ViewModels.SongCreateViewModel
+@{
+    ViewData["Title"] = "Add New Song";
+}
+
+<h1>Add New Song</h1>
+<p class="text-muted">Lyrics and timestamps are fetched automatically from <strong>lrclib.net</strong> using the title and artist you enter below.</p>
+
+<div class="row">
+    <div class="col-md-7">
+        <form asp-action="Create" method="post" enctype="multipart/form-data">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <h5 class="mt-3">Song Details</h5>
+            <div class="mb-3">
+                <label asp-for="Title" class="form-label">Title <span class="text-danger">*</span></label>
+                <input asp-for="Title" class="form-control" placeholder="e.g. Talagh" />
+                <div class="form-text">Must match the title on lrclib.net exactly.</div>
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Artist" class="form-label">Artist <span class="text-danger">*</span></label>
+                <input asp-for="Artist" class="form-control" placeholder="e.g. Googoosh" />
+                <div class="form-text">Must match the artist name on lrclib.net exactly.</div>
+                <span asp-validation-for="Artist" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Year" class="form-label">Year <span class="text-muted">(optional)</span></label>
+                <input asp-for="Year" class="form-control" placeholder="e.g. 1985" />
+            </div>
+            <div class="mb-3">
+                <label asp-for="Notes" class="form-label">Notes <span class="text-muted">(optional)</span></label>
+                <textarea asp-for="Notes" class="form-control" rows="3" placeholder="Why this song was chosen..."></textarea>
+            </div>
+
+            <h5 class="mt-4">Upload Files</h5>
+            <div class="mb-3">
+                <label asp-for="AudioFile" class="form-label">Audio File <span class="text-danger">*</span></label>
+                <input asp-for="AudioFile" type="file" class="form-control" accept=".mp3,.wav" />
+                <div class="form-text">Persian song audio — .mp3 or .wav</div>
+                <span asp-validation-for="AudioFile" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="BackgroundFile" class="form-label">Background Photo <span class="text-danger">*</span></label>
+                <input asp-for="BackgroundFile" type="file" class="form-control" accept=".jpg,.jpeg,.png" />
+                <div class="form-text">One artistic background photo for all verse cards — .jpg or .png</div>
+                <span asp-validation-for="BackgroundFile" class="text-danger"></span>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">Fetch Lyrics &amp; Create Song</button>
+                <a asp-action="Index" class="btn btn-outline-secondary ms-2">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-md-4 offset-md-1 mt-4">
+        <div class="alert alert-info">
+            <strong>How it works</strong>
+            <ol class="mb-0 mt-2 ps-3">
+                <li>Enter the song title and artist as they appear on <a href="https://lrclib.net" target="_blank">lrclib.net</a>.</li>
+                <li>Lyrics and per-line timestamps are fetched automatically.</li>
+                <li>You upload the audio and background image.</li>
+                <li>Then translate and generate cards &amp; video.</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

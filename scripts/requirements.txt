@@ -1,0 +1,4 @@
+Pillow
+moviepy
+playwright
+jinja2
