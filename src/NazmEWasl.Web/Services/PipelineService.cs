@@ -83,6 +83,8 @@ public class PipelineService : IPipelineService
         {
             persian_font_size   = _settings.Get("Card.PersianFontSize",   "56"),
             roman_font_size     = _settings.Get("Card.RomanUrduFontSize", "34"),
+            english_font_size   = _settings.Get("Card.EnglishFontSize",   "26"),
+            hindi_font_size     = _settings.Get("Card.HindiFontSize",     "26"),
             font_family         = _settings.Get("Card.FontFamily",        "Amiri"),
             overlay_opacity     = _settings.Get("Card.OverlayOpacity",    "0.72")
         };
@@ -92,7 +94,7 @@ public class PipelineService : IPipelineService
 
         var scriptPath = Path.Combine(ScriptsPath, "card_renderer.py");
         await RunScriptAsync(songId, PipelineStep.CardRendering,
-            $"\"{scriptPath}\" --song-id {songId} --settings-json \"{settingsJsonPath}\"", ct);
+            $"\"{scriptPath}\" --song-id {songId} --settings-json \"{settingsJsonPath}\" --workers 4", ct);
     }
 
     public async Task RunVideoRenderingAsync(string songId, CancellationToken ct = default)
@@ -105,11 +107,16 @@ public class PipelineService : IPipelineService
         var width    = _settings.Get("Video.Width",            "1080");
         var height   = _settings.Get("Video.Height",           "1080");
         var endDur   = _settings.Get("Video.EndCardDurationSec","5");
+        var codec    = _settings.Get("Video.Codec",            "libx264");
+        var crf      = _settings.Get("Video.Crf",              "23");
+        var preset   = _settings.Get("Video.Preset",           "fast");
+        var format   = _settings.Get("Video.Format",           "mp4");
 
         var scriptPath = Path.Combine(ScriptsPath, "video_renderer.py");
         await RunScriptAsync(songId, PipelineStep.VideoRendering,
             $"\"{scriptPath}\" --song-id {songId} --audio \"{audioPath}\"" +
-            $" --fps {fps} --width {width} --height {height} --end-card-duration {endDur}", ct);
+            $" --fps {fps} --width {width} --height {height} --end-card-duration {endDur}" +
+            $" --codec {codec} --crf {crf} --preset {preset} --format {format}", ct);
 
         var song = await _db.Songs.FirstAsync(s => s.SongId == songId, ct);
         if (_storage.GetVideoPath(songId) != null)

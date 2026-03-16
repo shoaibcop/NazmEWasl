@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import asyncio
 import base64
 import json
 import os
@@ -82,6 +83,8 @@ def load_render_settings(settings_json_path: str | None) -> dict:
     defaults = {
         "persian_font_size": "56",
         "roman_font_size": "34",
+        "english_font_size": "26",
+        "hindi_font_size": "26",
         "font_family": "Amiri",
         "overlay_opacity": "0.72",
     }
@@ -92,9 +95,16 @@ def load_render_settings(settings_json_path: str | None) -> dict:
     return defaults
 
 
-def render_cards(song_meta: dict, verses: list[dict], inputs_dir: str, cards_dir: str, settings: dict | None = None) -> None:
+async def render_cards_async(
+    song_meta: dict,
+    verses: list[dict],
+    inputs_dir: str,
+    cards_dir: str,
+    settings: dict,
+    workers: int = 4,
+) -> None:
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.async_api import async_playwright
     except ImportError:
         print(
             "ERROR: playwright is not installed. Run: pip install playwright && playwright install chromium",
@@ -102,18 +112,16 @@ def render_cards(song_meta: dict, verses: list[dict], inputs_dir: str, cards_dir
         )
         sys.exit(1)
 
-    if settings is None:
-        settings = {}
-
     persian_font_size = settings.get("persian_font_size", "56")
     roman_font_size   = settings.get("roman_font_size", "34")
+    english_font_size = settings.get("english_font_size", "26")
+    hindi_font_size   = settings.get("hindi_font_size", "26")
     font_family       = settings.get("font_family", "Amiri")
     overlay_opacity   = settings.get("overlay_opacity", "0.72")
 
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     verse_template = env.get_template("verse_card.html")
 
-    # Load end card template if it exists
     end_card_template = None
     end_card_path_tpl = os.path.join(TEMPLATES_DIR, "end_card.html")
     if os.path.exists(end_card_path_tpl):
@@ -124,71 +132,89 @@ def render_cards(song_meta: dict, verses: list[dict], inputs_dir: str, cards_dir
 
     os.makedirs(cards_dir, exist_ok=True)
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1080, "height": 1080})
+    # Pre-render all HTML (Jinja2 is sync; do this before entering async context)
+    items: list[tuple[str, str]] = []
+    for verse in verses:
+        n = verse["verse_number"]
+        keywords = verse.get("keywords") or []
+        verse_bg_b64 = load_verse_image_b64(inputs_dir, n) or global_bg_b64 or ""
+        roman_urdu_html = inject_keyword_spans(verse.get("roman_urdu", ""), keywords)
+        html = verse_template.render(
+            title=song_meta["title"],
+            artist=song_meta["artist"],
+            verse_number=n,
+            total_verses=song_meta["total_verses"],
+            persian_text=verse["persian_text"],
+            roman_urdu_html=roman_urdu_html,
+            english_text=verse.get("english_text") or "",
+            hindi_text=verse.get("hindi_text") or "",
+            keywords=keywords,
+            background_b64=verse_bg_b64,
+            fonts_dir=fonts_dir_uri,
+            persian_font_size=persian_font_size,
+            roman_font_size=roman_font_size,
+            english_font_size=english_font_size,
+            hindi_font_size=hindi_font_size,
+            font_family=font_family,
+            overlay_opacity=overlay_opacity,
+        )
+        items.append((html, os.path.join(cards_dir, f"verse_{n:02d}.png")))
 
-        for verse in verses:
-            n = verse["verse_number"]
-            keywords = verse.get("keywords") or []
+    if end_card_template is not None:
+        end_html = end_card_template.render(
+            title=song_meta["title"],
+            artist=song_meta["artist"],
+            background_b64=global_bg_b64 or "",
+            fonts_dir=fonts_dir_uri,
+        )
+        items.append((end_html, os.path.join(cards_dir, "end_card.png")))
 
-            # Per-verse image overrides global background (foundation for AI image gen)
-            verse_bg_b64 = load_verse_image_b64(inputs_dir, n) or global_bg_b64 or ""
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        sem = asyncio.Semaphore(workers)
 
-            roman_urdu_html = inject_keyword_spans(verse.get("roman_urdu", ""), keywords)
+        async def render_one(html: str, out_path: str) -> None:
+            async with sem:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".html", encoding="utf-8", delete=False
+                ) as tmp:
+                    tmp.write(html)
+                    tmp_path = tmp.name
+                page = await browser.new_page(viewport={"width": 1080, "height": 1080})
+                try:
+                    await page.goto(f"file:///{tmp_path.replace(chr(92), '/')}")
+                    await page.wait_for_load_state("load")
+                    await page.screenshot(
+                        path=out_path,
+                        clip={"x": 0, "y": 0, "width": 1080, "height": 1080},
+                    )
+                    print(f"  Saved {out_path}")
+                finally:
+                    await page.close()
+                    os.remove(tmp_path)
 
-            html = verse_template.render(
-                title=song_meta["title"],
-                artist=song_meta["artist"],
-                verse_number=n,
-                total_verses=song_meta["total_verses"],
-                persian_text=verse["persian_text"],
-                roman_urdu_html=roman_urdu_html,
-                keywords=keywords,
-                background_b64=verse_bg_b64,
-                fonts_dir=fonts_dir_uri,
-                persian_font_size=persian_font_size,
-                roman_font_size=roman_font_size,
-                font_family=font_family,
-                overlay_opacity=overlay_opacity,
-            )
-
-            _screenshot_html(page, html, os.path.join(cards_dir, f"verse_{n:02d}.png"))
-
-        # Render end card
-        if end_card_template is not None:
-            end_html = end_card_template.render(
-                title=song_meta["title"],
-                artist=song_meta["artist"],
-                background_b64=global_bg_b64 or "",
-                fonts_dir=fonts_dir_uri,
-            )
-            _screenshot_html(page, end_html, os.path.join(cards_dir, "end_card.png"))
-
-        browser.close()
+        await asyncio.gather(*[render_one(html, out_path) for html, out_path in items])
+        await browser.close()
 
 
-def _screenshot_html(page, html: str, out_path: str) -> None:
-    """Write html to a temp file, screenshot it, then clean up."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".html", encoding="utf-8", delete=False
-    ) as tmp:
-        tmp.write(html)
-        tmp_path = tmp.name
-
-    try:
-        page.goto(f"file:///{tmp_path.replace(chr(92), '/')}")
-        page.wait_for_load_state("networkidle")
-        page.screenshot(path=out_path, clip={"x": 0, "y": 0, "width": 1080, "height": 1080})
-        print(f"  Saved {out_path}")
-    finally:
-        os.remove(tmp_path)
+def render_cards(
+    song_meta: dict,
+    verses: list[dict],
+    inputs_dir: str,
+    cards_dir: str,
+    settings: dict | None = None,
+    workers: int = 4,
+) -> None:
+    asyncio.run(
+        render_cards_async(song_meta, verses, inputs_dir, cards_dir, settings or {}, workers=workers)
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Verse card renderer (Playwright)")
     parser.add_argument("--song-id", required=True)
     parser.add_argument("--settings-json", required=False, default=None)
+    parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
 
     song_id = args.song_id
@@ -217,7 +243,7 @@ def main():
 
     settings = load_render_settings(args.settings_json)
     print(f"Rendering {len(verses)} card(s) for '{song_meta['title']}' by {song_meta['artist']} …")
-    render_cards(song_meta, verses, inputs_dir, cards_dir, settings=settings)
+    render_cards(song_meta, verses, inputs_dir, cards_dir, settings=settings, workers=args.workers)
     print(f"Done. {len(verses)} card(s) written to {cards_dir}")
     sys.exit(0)
 

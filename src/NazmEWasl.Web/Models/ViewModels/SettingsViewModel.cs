@@ -20,6 +20,8 @@ public class SettingsViewModel
     // Card Appearance
     public string PersianFontSize   { get; set; } = "56";
     public string RomanUrduFontSize { get; set; } = "34";
+    public string EnglishFontSize   { get; set; } = "26";
+    public string HindiFontSize     { get; set; } = "26";
     public string FontFamily        { get; set; } = "Amiri";
     public string OverlayOpacity    { get; set; } = "0.72";
 
@@ -28,4 +30,8 @@ public class SettingsViewModel
     public string Width              { get; set; } = "1080";
     public string Height             { get; set; } = "1080";
     public string EndCardDurationSec { get; set; } = "5";
+    public string VideoCodec         { get; set; } = "libx264";
+    public string VideoCrf           { get; set; } = "23";
+    public string VideoPreset        { get; set; } = "fast";
+    public string VideoFormat        { get; set; } = "mp4";
 }

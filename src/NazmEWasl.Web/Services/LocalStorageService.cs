@@ -52,8 +52,9 @@ public class LocalStorageService : IStorageService
 
     public string? GetVideoPath(string songId)
     {
-        var videoPath = Path.Combine(GetOutputPath(songId, "video"), "full_video.mp4");
-        return File.Exists(videoPath) ? videoPath : null;
+        var videoDir = GetOutputPath(songId, "video");
+        if (!Directory.Exists(videoDir)) return null;
+        return Directory.GetFiles(videoDir, "full_video.*").FirstOrDefault();
     }
 
     public void DeleteOutputs(string songId)

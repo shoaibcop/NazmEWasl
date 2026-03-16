@@ -29,6 +29,8 @@ public class SettingsController : Controller
 
             PersianFontSize   = _settings.Get("Card.PersianFontSize",   "56"),
             RomanUrduFontSize = _settings.Get("Card.RomanUrduFontSize", "34"),
+            EnglishFontSize   = _settings.Get("Card.EnglishFontSize",   "26"),
+            HindiFontSize     = _settings.Get("Card.HindiFontSize",     "26"),
             FontFamily        = _settings.Get("Card.FontFamily",        "Amiri"),
             OverlayOpacity    = _settings.Get("Card.OverlayOpacity",    "0.72"),
 
@@ -36,6 +38,10 @@ public class SettingsController : Controller
             Width              = _settings.Get("Video.Width",             "1080"),
             Height             = _settings.Get("Video.Height",            "1080"),
             EndCardDurationSec = _settings.Get("Video.EndCardDurationSec","5"),
+            VideoCodec         = _settings.Get("Video.Codec",            "libx264"),
+            VideoCrf           = _settings.Get("Video.Crf",              "23"),
+            VideoPreset        = _settings.Get("Video.Preset",           "fast"),
+            VideoFormat        = _settings.Get("Video.Format",           "mp4"),
         };
         return View(vm);
     }
@@ -58,14 +64,20 @@ public class SettingsController : Controller
         _settings.Set("OpenAI:MaxTokens", vm.OpenAiMaxTokens);
 
         _settings.Set("Card.PersianFontSize",   vm.PersianFontSize);
-        _settings.Set("Card.RomanUrduFontSize",  vm.RomanUrduFontSize);
-        _settings.Set("Card.FontFamily",         vm.FontFamily);
-        _settings.Set("Card.OverlayOpacity",     vm.OverlayOpacity);
+        _settings.Set("Card.RomanUrduFontSize", vm.RomanUrduFontSize);
+        _settings.Set("Card.EnglishFontSize",   vm.EnglishFontSize);
+        _settings.Set("Card.HindiFontSize",     vm.HindiFontSize);
+        _settings.Set("Card.FontFamily",        vm.FontFamily);
+        _settings.Set("Card.OverlayOpacity",    vm.OverlayOpacity);
 
         _settings.Set("Video.Fps",               vm.Fps);
         _settings.Set("Video.Width",             vm.Width);
         _settings.Set("Video.Height",            vm.Height);
         _settings.Set("Video.EndCardDurationSec",vm.EndCardDurationSec);
+        _settings.Set("Video.Codec",             vm.VideoCodec);
+        _settings.Set("Video.Crf",               vm.VideoCrf);
+        _settings.Set("Video.Preset",            vm.VideoPreset);
+        _settings.Set("Video.Format",            vm.VideoFormat);
 
         await _settings.SaveAsync();
 

@@ -26,60 +26,107 @@
 }
 else
 {
-    <table class="table table-hover">
-        <thead class="table-dark">
-            <tr>
-                <th>Title</th>
-                <th>Artist</th>
-                <th>Verses</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var song in Model)
-            {
+    <form id="batchTranslateForm" asp-controller="Songs" asp-action="TranslateSelected" method="post">
+        @Html.AntiForgeryToken()
+
+        <div id="batchToolbar" class="alert alert-secondary d-flex align-items-center gap-3 mb-3 p-2" style="display:none">
+            <span id="selectedCount" class="fw-bold text-nowrap">0 selected</span>
+            <select name="provider" class="form-select form-select-sm" style="width:auto">
+                <option value="Claude">Claude (Batch)</option>
+                <option value="OpenAI">OpenAI (Batch)</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary text-nowrap">Batch Translate Selected</button>
+            <button type="button" id="clearSelection" class="btn btn-sm btn-outline-secondary ms-auto">Clear</button>
+        </div>
+
+        <table class="table table-hover">
+            <thead class="table-dark">
                 <tr>
-                    <td>@song.Title</td>
-                    <td>@song.Artist</td>
-                    <td>@song.Verses.Count</td>
-                    <td>
-                        <span class="badge @StatusBadge(song.Status)">
-                            @if (song.Status == SongStatus.Translating)
-                            { <text>&#128336; Translating</text> }
-                            else
-                            { @song.Status.ToString() }
-                        </span>
-                    </td>
-                    <td>@song.CreatedAt.ToString("yyyy-MM-dd")</td>
-                    <td>
-                        <a asp-action="Detail" asp-route-id="@song.Id" class="btn btn-sm btn-outline-primary">Detail</a>
-                        @if (song.Status >= SongStatus.AwaitingReview)
-                        {
-                            <a asp-controller="Translation" asp-action="Review" asp-route-songId="@song.Id" class="btn btn-sm btn-outline-warning ms-1">Review</a>
-                        }
-                        @if (song.Status == SongStatus.Approved)
-                        {
-                            <form asp-controller="Assets" asp-action="Generate" asp-route-songId="@song.Id" method="post" class="d-inline ms-1">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-success">Generate</button>
-                            </form>
-                        }
-                        @if (song.Status == SongStatus.GeneratingAssets)
-                        {
-                            <a asp-controller="Assets" asp-action="Progress" asp-route-songId="@song.Id"
-                               class="btn btn-sm btn-outline-info ms-1 disabled">
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>Generating...
-                            </a>
-                        }
-                        @if (song.Status == SongStatus.Complete)
-                        {
-                            <a asp-controller="Assets" asp-action="Index" asp-route-songId="@song.Id" class="btn btn-sm btn-outline-success ms-1">Assets &#8595;</a>
-                        }
-                    </td>
+                    <th style="width:40px"><input type="checkbox" id="selectAll" class="form-check-input" title="Select all"></th>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Verses</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var song in Model)
+                {
+                    <tr>
+                        <td><input type="checkbox" name="songIds" value="@song.Id" class="form-check-input song-checkbox"></td>
+                        <td>@song.Title</td>
+                        <td>@song.Artist</td>
+                        <td>@song.Verses.Count</td>
+                        <td>
+                            <span class="badge @StatusBadge(song.Status)">
+                                @if (song.Status == SongStatus.Translating)
+                                { <text>&#128336; Translating</text> }
+                                else
+                                { @song.Status.ToString() }
+                            </span>
+                        </td>
+                        <td>@song.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <a asp-action="Detail" asp-route-id="@song.Id" class="btn btn-sm btn-outline-primary">Detail</a>
+                            @if (song.Status >= SongStatus.AwaitingReview)
+                            {
+                                <a asp-controller="Translation" asp-action="Review" asp-route-songId="@song.Id" class="btn btn-sm btn-outline-warning ms-1">Review</a>
+                            }
+                            @if (song.Status == SongStatus.Approved)
+                            {
+                                <form asp-controller="Assets" asp-action="Generate" asp-route-songId="@song.Id" method="post" class="d-inline ms-1">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-success">Generate</button>
+                                </form>
+                            }
+                            @if (song.Status == SongStatus.GeneratingAssets)
+                            {
+                                <a asp-controller="Assets" asp-action="Progress" asp-route-songId="@song.Id"
+                                   class="btn btn-sm btn-outline-info ms-1 disabled">
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>Generating...
+                                </a>
+                            }
+                            @if (song.Status == SongStatus.Complete)
+                            {
+                                <a asp-controller="Assets" asp-action="Index" asp-route-songId="@song.Id" class="btn btn-sm btn-outline-success ms-1">Assets &#8595;</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </form>
+
+    <script>
+        const checkboxes = document.querySelectorAll('.song-checkbox');
+        const selectAll  = document.getElementById('selectAll');
+        const toolbar    = document.getElementById('batchToolbar');
+        const countLabel = document.getElementById('selectedCount');
+
+        function updateToolbar() {
+            const checked = document.querySelectorAll('.song-checkbox:checked').length;
+            toolbar.style.display = checked > 0 ? 'flex' : 'none';
+            countLabel.textContent = checked + ' selected';
+            selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
+        }
+
+        selectAll.addEventListener('change', () => {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateToolbar();
+        });
+
+        checkboxes.forEach(cb => cb.addEventListener('change', () => {
+            selectAll.checked = [...checkboxes].every(c => c.checked);
+            updateToolbar();
+        }));
+
+        document.getElementById('clearSelection').addEventListener('click', () => {
+            checkboxes.forEach(cb => cb.checked = false);
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+            updateToolbar();
+        });
+    </script>
 }

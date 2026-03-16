@@ -124,6 +124,20 @@
                         <input type="number" class="form-control form-control-sm mt-1" asp-for="RomanUrduFontSize" min="18" max="64">
                     </div>
                     <div class="mb-4">
+                        <label class="form-label fw-semibold">English Font Size: <span id="english-size-val">@Model.EnglishFontSize</span>px</label>
+                        <input type="range" class="form-range" min="16" max="48" step="2"
+                               asp-for="EnglishFontSize" id="english-size-range"
+                               oninput="document.getElementById('english-size-val').textContent=this.value">
+                        <input type="number" class="form-control form-control-sm mt-1" asp-for="EnglishFontSize" min="16" max="48">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Hindi Font Size: <span id="hindi-size-val">@Model.HindiFontSize</span>px</label>
+                        <input type="range" class="form-range" min="16" max="48" step="2"
+                               asp-for="HindiFontSize" id="hindi-size-range"
+                               oninput="document.getElementById('hindi-size-val').textContent=this.value">
+                        <input type="number" class="form-control form-control-sm mt-1" asp-for="HindiFontSize" min="16" max="48">
+                    </div>
+                    <div class="mb-4">
                         <label class="form-label fw-semibold">Font Family</label>
                         <select class="form-select" asp-for="FontFamily">
                             <option>Amiri</option>
@@ -173,6 +187,39 @@
                         <label class="form-label fw-semibold">End Card Duration (seconds)</label>
                         <input type="number" class="form-control" asp-for="EndCardDurationSec" min="1" max="30">
                     </div>
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Video Codec</label>
+                        <select class="form-select" asp-for="VideoCodec" id="codec-select" onchange="onCodecChange(this.value)">
+                            <option value="libx264">H.264 (libx264) — MP4, widest compatibility</option>
+                            <option value="libx265">H.265 / HEVC (libx265) — smaller files, slower</option>
+                            <option value="libvpx-vp9">VP9 (libvpx-vp9) — WebM, open format</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="crf-group">
+                        <label class="form-label fw-semibold">CRF Quality: <span id="crf-val">@Model.VideoCrf</span> <small class="text-muted">(0=lossless · 23=default · 51=worst)</small></label>
+                        <input type="range" class="form-range" min="0" max="51" step="1"
+                               asp-for="VideoCrf" id="crf-range"
+                               oninput="document.getElementById('crf-val').textContent=this.value">
+                        <input type="number" class="form-control form-control-sm mt-1" asp-for="VideoCrf" min="0" max="51">
+                    </div>
+                    <div class="mb-3" id="preset-group">
+                        <label class="form-label fw-semibold">Encoding Preset</label>
+                        <select class="form-select" asp-for="VideoPreset">
+                            <option value="ultrafast">ultrafast (largest file, fastest)</option>
+                            <option value="fast">fast</option>
+                            <option value="medium">medium</option>
+                            <option value="slow">slow (smallest file, slowest)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Output Format</label>
+                        <select class="form-select" asp-for="VideoFormat" id="format-select">
+                            <option value="mp4">mp4</option>
+                            <option value="webm">webm</option>
+                            <option value="mkv">mkv</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -191,5 +238,17 @@ function applyResolution(val) {
     document.querySelector('[name="Width"]').value  = parts[0];
     document.querySelector('[name="Height"]').value = parts[1];
 }
+
+function onCodecChange(codec) {
+    const isVp9 = codec === 'libvpx-vp9';
+    document.getElementById('crf-group').style.display    = isVp9 ? 'none' : '';
+    document.getElementById('preset-group').style.display = isVp9 ? 'none' : '';
+    if (isVp9) document.getElementById('format-select').value = 'webm';
+}
+
+// Apply on page load to reflect saved setting
+document.addEventListener('DOMContentLoaded', function() {
+    onCodecChange(document.getElementById('codec-select').value);
+});
 </script>
 }

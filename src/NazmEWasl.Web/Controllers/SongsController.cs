@@ -258,6 +258,77 @@ public class SongsController : Controller
         return RedirectToAction(nameof(Detail), new { id });
     }
 
+    // POST /songs/translate-selected
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TranslateSelected(int[] songIds, string? provider)
+    {
+        if (songIds == null || songIds.Length == 0)
+        {
+            TempData["Error"] = "No songs selected.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var resolvedProvider = string.IsNullOrWhiteSpace(provider) ? "Claude" : provider.Trim();
+
+        if (resolvedProvider.Equals("Gemini", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["Error"] = "Gemini does not support batch translation.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var batchSvc  = _batchFactory.Create(resolvedProvider);
+        var submitted = 0;
+        var errors    = new List<string>();
+
+        foreach (var id in songIds)
+        {
+            var song = await _db.Songs
+                .Include(s => s.Verses)
+                .FirstOrDefaultAsync(s => s.Id == id);
+
+            if (song == null) continue;
+
+            var selectedLanguages = string.IsNullOrWhiteSpace(song.SelectedLanguages)
+                ? new List<string> { "RomanUrdu" }
+                : song.SelectedLanguages.Split(',').ToList();
+
+            song.LastTranslationProvider = resolvedProvider;
+            song.Status = SongStatus.Translating;
+            await _db.SaveChangesAsync();
+
+            try
+            {
+                var externalId = await batchSvc.SubmitBatchAsync(song, selectedLanguages);
+
+                _db.TranslationBatches.Add(new TranslationBatch
+                {
+                    SongId          = song.Id,
+                    Provider        = resolvedProvider,
+                    ExternalBatchId = externalId,
+                    Status          = BatchStatus.Submitted,
+                    SubmittedAt     = DateTime.UtcNow
+                });
+                await _db.SaveChangesAsync();
+                submitted++;
+            }
+            catch (Exception ex)
+            {
+                song.Status = SongStatus.Uploaded;
+                await _db.SaveChangesAsync();
+                errors.Add($"{song.Title}: {ex.Message}");
+            }
+        }
+
+        if (errors.Count > 0)
+            TempData["Error"] = $"Some submissions failed: {string.Join("; ", errors)}";
+
+        if (submitted > 0)
+            TempData["Success"] = $"{submitted} song(s) submitted to {resolvedProvider} for batch translation.";
+
+        return RedirectToAction(nameof(Index));
+    }
+
     // GET /songs/{id}/batch-status
     [HttpGet]
     public async Task<IActionResult> CheckBatchStatus(int id)

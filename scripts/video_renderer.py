@@ -33,6 +33,10 @@ def main():
     parser.add_argument("--width", type=int, default=1080)
     parser.add_argument("--height", type=int, default=1080)
     parser.add_argument("--end-card-duration", type=float, default=5.0)
+    parser.add_argument("--codec", default="libx264")
+    parser.add_argument("--crf", default="23")
+    parser.add_argument("--preset", default="fast")
+    parser.add_argument("--format", default="mp4")
     args = parser.parse_args()
 
     song_id = args.song_id
@@ -41,7 +45,7 @@ def main():
     inputs_dir = os.path.abspath(os.path.join(songs_root, song_id, "inputs"))
     cards_dir = os.path.abspath(os.path.join(songs_root, song_id, "outputs", "cards"))
     video_dir = os.path.abspath(os.path.join(songs_root, song_id, "outputs", "video"))
-    output_path = os.path.join(video_dir, "full_video.mp4")
+    output_path = os.path.join(video_dir, f"full_video.{args.format}")
     verses_path = os.path.join(inputs_dir, "verses.json")
 
     if not os.path.exists(args.audio):
@@ -127,7 +131,16 @@ def main():
     video = video.with_audio(audio_clip)
 
     print(f"Writing video: {len(clips)} clip(s), {video.duration:.1f}s total …")
-    video.write_videofile(output_path, fps=args.fps, logger=None)
+    ffmpeg_params = ["-crf", args.crf]
+    if args.codec != "libvpx-vp9":
+        ffmpeg_params += ["-preset", args.preset]
+    video.write_videofile(
+        output_path,
+        fps=args.fps,
+        codec=args.codec,
+        ffmpeg_params=ffmpeg_params,
+        logger=None,
+    )
 
     audio_clip.close()
     print(f"Wrote {output_path}")
